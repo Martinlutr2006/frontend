@@ -1,191 +1,288 @@
-import { useEffect, useState } from "react";
-import api from "../api";
+import React, { useState, useEffect } from 'react';
+import api from '../api';
 
-const CarManager = () => {
+function CarManager() {
   const [cars, setCars] = useState([]);
-  const [form, setForm] = useState({
-    platenumber: "",
-    type: "",
-    model: "",
-    manufacturing_year: "",
-    driver_phone: "",
-    mechanic_name: "",
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [editingCar, setEditingCar] = useState(null);
+  const [formData, setFormData] = useState({
+    plate_number: '',
+    car_type: '',
+    car_size: '',
+    driver_name: '',
+    driver_phone: ''
   });
-  const [editingPlate, setEditingPlate] = useState(null);
-
-  const fetchCars = async () => {
-    try {
-      const res = await api.get("/cars");
-      setCars(res.data);
-    } catch (err) {
-      alert("Error fetching cars");
-    }
-  };
 
   useEffect(() => {
     fetchCars();
   }, []);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const fetchCars = async () => {
+    try {
+      const response = await api.get('/cars');
+      setCars(response.data);
+      setLoading(false);
+    } catch (err) {
+      setError('Failed to fetch cars');
+      setLoading(false);
+      console.error('Error fetching cars:', err);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (editingPlate) {
-        await api.put(`/cars/${editingPlate}`, form);
-        setEditingPlate(null);
+      if (editingCar) {
+        // Update existing car
+        await api.put(`/cars/${editingCar}`, formData);
+        alert('Car updated successfully');
       } else {
-        await api.post("/cars", form);
+        // Add new car
+        await api.post('/cars', formData);
+        alert('Car added successfully');
       }
-      setForm({
-        platenumber: "",
-        type: "",
-        model: "",
-        manufacturing_year: "",
-        driver_phone: "",
-        mechanic_name: "",
-      });
       fetchCars();
+      resetForm();
     } catch (err) {
-      alert("Error submitting car");
+      setError(editingCar ? 'Failed to update car' : 'Failed to add car');
+      console.error('Error:', err);
     }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleEdit = (car) => {
-    setForm({
-      platenumber: car.platenumber,
-      type: car.type,
-      model: car.model,
-      manufacturing_year: car.manufacturing_year,
-      driver_phone: car.driver_phone,
-      mechanic_name: car.mechanic_name,
+    setEditingCar(car.plate_number);
+    setFormData({
+      plate_number: car.plate_number,
+      car_type: car.car_type,
+      car_size: car.car_size,
+      driver_name: car.driver_name,
+      driver_phone: car.driver_phone
     });
-    setEditingPlate(car.platenumber);
   };
 
-  const handleDelete = async (platenumber) => {
-    if (!window.confirm("Are you sure you want to delete this car?")) return;
+  const handleDelete = async (plateNumber) => {
+    if (!window.confirm('Are you sure you want to delete this car?')) return;
+    
     try {
-      await api.delete(`/cars/${platenumber}`);
-      fetchCars();
-      if (editingPlate === platenumber) {
-        setForm({
-          platenumber: "",
-          type: "",
-          model: "",
-          manufacturing_year: "",
-          driver_phone: "",
-          mechanic_name: "",
-        });
-        setEditingPlate(null);
+      const response = await api.delete(`/cars/${plateNumber}`);
+      if (response.data.message) {
+        alert(response.data.message);
       }
+      fetchCars();
     } catch (err) {
-      alert("Error deleting car");
+      const errorMessage = err.response?.data?.message || 'Failed to delete car';
+      alert(errorMessage);
+      console.error('Error deleting car:', err);
     }
   };
 
-  return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h2 className="text-xl font-bold mb-4">Manage Cars</h2>
-      <form onSubmit={handleSubmit} className="bg-white p-4 rounded shadow space-y-4 mb-6">
-        <input
-          name="platenumber"
-          value={form.platenumber}
-          onChange={handleChange}
-          placeholder="Plate Number"
-          className="w-full border p-2"
-          required
-          disabled={editingPlate !== null}
-        />
-        <input
-          name="type"
-          value={form.type}
-          onChange={handleChange}
-          placeholder="Car Type"
-          className="w-full border p-2"
-          required
-        />
-        <input
-          name="model"
-          value={form.model}
-          onChange={handleChange}
-          placeholder="Model"
-          className="w-full border p-2"
-          required
-        />
-        <input
-          name="manufacturing_year"
-          type="number"
-          value={form.manufacturing_year}
-          onChange={handleChange}
-          placeholder="Manufacturing Year"
-          className="w-full border p-2"
-          required
-        />
-        <input
-          name="driver_phone"
-          value={form.driver_phone}
-          onChange={handleChange}
-          placeholder="Driver Phone"
-          className="w-full border p-2"
-          required
-        />
-        <input
-          name="mechanic_name"
-          value={form.mechanic_name}
-          onChange={handleChange}
-          placeholder="Mechanic Name"
-          className="w-full border p-2"
-          required
-        />
-        <button className="bg-blue-600 text-white px-4 py-2 rounded">
-          {editingPlate ? "Update Car" : "Add Car"}
-        </button>
-      </form>
+  const resetForm = () => {
+    setEditingCar(null);
+    setFormData({
+      plate_number: '',
+      car_type: '',
+      car_size: '',
+      driver_name: '',
+      driver_phone: ''
+    });
+  };
 
-      <table className="w-full border-collapse border">
-        <thead>
-          <tr className="bg-gray-200">
-            <th className="border px-4 py-2">Plate Number</th>
-            <th className="border px-4 py-2">Type</th>
-            <th className="border px-4 py-2">Model</th>
-            <th className="border px-4 py-2">Year</th>
-            <th className="border px-4 py-2">Driver Phone</th>
-            <th className="border px-4 py-2">Mechanic</th>
-            <th className="border px-4 py-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cars.map((car) => (
-            <tr key={car.platenumber}>
-              <td className="border px-4 py-2">{car.platenumber}</td>
-              <td className="border px-4 py-2">{car.type}</td>
-              <td className="border px-4 py-2">{car.model}</td>
-              <td className="border px-4 py-2">{car.manufacturing_year}</td>
-              <td className="border px-4 py-2">{car.driver_phone}</td>
-              <td className="border px-4 py-2">{car.mechanic_name}</td>
-              <td className="border px-4 py-2 space-x-2">
-                <button
-                  onClick={() => handleEdit(car)}
-                  className="bg-yellow-400 px-2 py-1 rounded"
+  if (loading) return <div className="text-center py-4">Loading...</div>;
+  if (error) return <div className="text-center text-red-500 py-4">{error}</div>;
+
+  return (
+    <div className="space-y-6">
+      {/* Form */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg font-medium text-gray-900">
+            {editingCar ? 'Edit Car' : 'Add New Car'}
+          </h3>
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <label htmlFor="plate_number" className="block text-sm font-medium text-gray-700">
+                  Plate Number
+                </label>
+                <input
+                  type="text"
+                  name="plate_number"
+                  id="plate_number"
+                  value={formData.plate_number}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  required
+                  disabled={editingCar !== null}
+                />
+              </div>
+              <div>
+                <label htmlFor="car_type" className="block text-sm font-medium text-gray-700">
+                  Car Type
+                </label>
+                <select
+                  name="car_type"
+                  id="car_type"
+                  value={formData.car_type}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  required
                 >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(car.platenumber)}
-                  className="bg-red-600 text-white px-2 py-1 rounded"
+                  <option value="">Select type</option>
+                  <option value="Sedan">Sedan</option>
+                  <option value="SUV">SUV</option>
+                  <option value="Hatchback">Hatchback</option>
+                  <option value="Van">Van</option>
+                  <option value="Truck">Truck</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="car_size" className="block text-sm font-medium text-gray-700">
+                  Car Size
+                </label>
+                <select
+                  name="car_size"
+                  id="car_size"
+                  value={formData.car_size}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  required
                 >
-                  Delete
+                  <option value="">Select size</option>
+                  <option value="Small">Small</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Large">Large</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="driver_name" className="block text-sm font-medium text-gray-700">
+                  Driver Name
+                </label>
+                <input
+                  type="text"
+                  name="driver_name"
+                  id="driver_name"
+                  value={formData.driver_name}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="driver_phone" className="block text-sm font-medium text-gray-700">
+                  Driver Phone
+                </label>
+                <input
+                  type="tel"
+                  name="driver_phone"
+                  id="driver_phone"
+                  value={formData.driver_phone}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  required
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3">
+              {editingCar && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cancel
                 </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              )}
+              <button
+                type="submit"
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                {editingCar ? 'Update Car' : 'Add Car'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:px-6">
+          <h3 className="text-lg font-medium text-gray-900">Registered Cars</h3>
+        </div>
+        <div className="border-t border-gray-200">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Plate Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Size
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Driver Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Driver Phone
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {cars.map((car) => (
+                  <tr key={car.plate_number}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {car.plate_number}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {car.car_type}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {car.car_size}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {car.driver_name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {car.driver_phone}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                      <button
+                        onClick={() => handleEdit(car)}
+                        className="text-blue-600 hover:text-blue-900"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(car.plate_number)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
-};
+}
 
 export default CarManager; 

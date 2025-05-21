@@ -1,67 +1,175 @@
-import { useEffect, useState } from "react";
-import api from "../api";
+import React, { useState, useEffect } from 'react';
+import api from '../api';
 
-const Reports = () => {
-  const [month, setMonth] = useState("");
-  const [report, setReport] = useState([]);
+function Report() {
+  const [dailyReport, setDailyReport] = useState(null);
+  const [weeklyReport, setWeeklyReport] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [dateRange, setDateRange] = useState({
+    date: new Date().toISOString().split('T')[0],
+    start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    end_date: new Date().toISOString().split('T')[0]
+  });
 
-  const fetchReport = async () => {
-    if (!month) return;
+  const fetchDailyReport = async () => {
     try {
-      const res = await api.get("/payroll/" + month);
-      setReport(res.data);
+      setLoading(true);
+      const response = await api.get(`/reports/daily?date=${dateRange.date}`);
+      setDailyReport(response.data);
+      setLoading(false);
     } catch (err) {
-      alert("Error fetching report");
+      setError('Failed to fetch daily report');
+      setLoading(false);
+      console.error('Error fetching daily report:', err);
     }
   };
 
+  const fetchWeeklyReport = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(
+        `/reports/weekly?start_date=${dateRange.start_date}&end_date=${dateRange.end_date}`
+      );
+      setWeeklyReport(response.data);
+      setLoading(false);
+    } catch (err) {
+      setError('Failed to fetch weekly report');
+      setLoading(false);
+      console.error('Error fetching weekly report:', err);
+    }
+  };
+
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+    setDateRange(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   useEffect(() => {
-    fetchReport();
-  }, [month]);
+    fetchDailyReport();
+    fetchWeeklyReport();
+  }, [dateRange.date, dateRange.start_date, dateRange.end_date]);
+
+  if (loading) return <div className="text-center py-4">Loading...</div>;
+  if (error) return <div className="text-center text-red-500 py-4">{error}</div>;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h2 className="text-xl font-bold mb-4">Payroll Report</h2>
-      <div className="mb-4">
-        <label htmlFor="month" className="mr-2 font-semibold">Select Month (1-12):</label>
-        <input
-          id="month"
-          type="number"
-          min="1"
-          max="12"
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          className="border p-2 rounded w-20"
-        />
+    <div className="space-y-6">
+      {/* Daily Report */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg font-medium text-gray-900">Daily Report</h3>
+          <div className="mt-4">
+            <input
+              type="date"
+              name="date"
+              value={dateRange.date}
+              onChange={handleDateChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            />
+          </div>
+          {dailyReport && (
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-blue-800">Total Services</h4>
+                <p className="mt-1 text-2xl font-semibold text-blue-900">{dailyReport.total_services}</p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-green-800">Total Revenue</h4>
+                <p className="mt-1 text-2xl font-semibold text-green-900">
+                  {dailyReport.total_revenue?.toLocaleString() || 0} RWF
+                </p>
+              </div>
+              <div className="bg-yellow-50 p-4 rounded-lg">
+                <h4 className="text-sm font-medium text-yellow-800">Unpaid Services</h4>
+                <p className="mt-1 text-2xl font-semibold text-yellow-900">{dailyReport.unpaid_services}</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-      {report.length > 0 ? (
-        <table className="w-full border text-left">
-          <thead>
-            <tr className="bg-gray-200">
-              <th>First Name</th>
-              <th>Last Name</th>
-              <th>Position</th>
-              <th>Department</th>
-              <th>Net Salary</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.map((r, index) => (
-              <tr key={index} className="border-t">
-                <td>{r.firstName}</td>
-                <td>{r.lastName}</td>
-                <td>{r.position}</td>
-                <td>{r.departmentName}</td>
-                <td>{r.netSalary}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p>No data available for the selected month.</p>
-      )}
+
+      {/* Weekly Report */}
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg font-medium text-gray-900">Weekly Report</h3>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="start_date" className="block text-sm font-medium text-gray-700">
+                Start Date
+              </label>
+              <input
+                type="date"
+                name="start_date"
+                id="start_date"
+                value={dateRange.start_date}
+                onChange={handleDateChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">
+                End Date
+              </label>
+              <input
+                type="date"
+                name="end_date"
+                id="end_date"
+                value={dateRange.end_date}
+                onChange={handleDateChange}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              />
+            </div>
+          </div>
+          {weeklyReport.length > 0 && (
+            <div className="mt-6">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Services
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Revenue
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Unpaid Services
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {weeklyReport.map((report) => (
+                      <tr key={report.date}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(report.date).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {report.total_services}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {report.total_revenue?.toLocaleString() || 0} RWF
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {report.unpaid_services}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
-};
+}
 
-export default Reports;
+export default Report;

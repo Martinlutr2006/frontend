@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 
-function PaymentManager() {
-  const [payments, setPayments] = useState([]);
+function ServicePackageManager() {
   const [servicePackages, setServicePackages] = useState([]);
+  const [cars, setCars] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
-    amount_paid: '',
-    payment_date: new Date().toISOString().split('T')[0],
-    record_number: ''
+    service_date: new Date().toISOString().split('T')[0],
+    package_number: '',
+    plate_number: ''
   });
 
   useEffect(() => {
@@ -18,13 +19,15 @@ function PaymentManager() {
 
   const fetchData = async () => {
     try {
-      const [paymentsRes, servicePackagesRes] = await Promise.all([
-        api.get('/payments'),
-        api.get('/service-packages')
+      const [servicePackagesRes, carsRes, packagesRes] = await Promise.all([
+        api.get('/service-packages'),
+        api.get('/cars'),
+        api.get('/packages')
       ]);
 
-      setPayments(paymentsRes.data);
-      setServicePackages(servicePackagesRes.data.filter(sp => !sp.payment_number));
+      setServicePackages(servicePackagesRes.data);
+      setCars(carsRes.data);
+      setPackages(packagesRes.data);
       setLoading(false);
     } catch (err) {
       setError('Failed to fetch data');
@@ -36,16 +39,16 @@ function PaymentManager() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/payments', formData);
+      await api.post('/service-packages', formData);
       fetchData();
       setFormData({
-        amount_paid: '',
-        payment_date: new Date().toISOString().split('T')[0],
-        record_number: ''
+        service_date: new Date().toISOString().split('T')[0],
+        package_number: '',
+        plate_number: ''
       });
     } catch (err) {
-      setError('Failed to add payment');
-      console.error('Error adding payment:', err);
+      setError('Failed to create service package');
+      console.error('Error creating service package:', err);
     }
   };
 
@@ -65,58 +68,62 @@ function PaymentManager() {
       {/* Form */}
       <div className="bg-white shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg font-medium text-gray-900">Record New Payment</h3>
+          <h3 className="text-lg font-medium text-gray-900">New Service Package</h3>
           <form onSubmit={handleSubmit} className="mt-5 space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <label htmlFor="record_number" className="block text-sm font-medium text-gray-700">
-                  Service Package
+                <label htmlFor="service_date" className="block text-sm font-medium text-gray-700">
+                  Service Date
+                </label>
+                <input
+                  type="date"
+                  name="service_date"
+                  id="service_date"
+                  value={formData.service_date}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="plate_number" className="block text-sm font-medium text-gray-700">
+                  Car
                 </label>
                 <select
-                  name="record_number"
-                  id="record_number"
-                  value={formData.record_number}
+                  name="plate_number"
+                  id="plate_number"
+                  value={formData.plate_number}
                   onChange={handleChange}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                   required
                 >
-                  <option value="">Select a service package</option>
-                  {servicePackages.map(sp => (
-                    <option key={sp.record_number} value={sp.record_number}>
-                      {sp.plate_number} - {sp.package_name} ({sp.package_price.toLocaleString()} RWF)
+                  <option value="">Select a car</option>
+                  {cars.map(car => (
+                    <option key={car.plate_number} value={car.plate_number}>
+                      {car.plate_number} - {car.driver_name}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label htmlFor="amount_paid" className="block text-sm font-medium text-gray-700">
-                  Amount Paid (RWF)
+                <label htmlFor="package_number" className="block text-sm font-medium text-gray-700">
+                  Package
                 </label>
-                <input
-                  type="number"
-                  name="amount_paid"
-                  id="amount_paid"
-                  value={formData.amount_paid}
+                <select
+                  name="package_number"
+                  id="package_number"
+                  value={formData.package_number}
                   onChange={handleChange}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                   required
-                  min="0"
-                  step="100"
-                />
-              </div>
-              <div>
-                <label htmlFor="payment_date" className="block text-sm font-medium text-gray-700">
-                  Payment Date
-                </label>
-                <input
-                  type="date"
-                  name="payment_date"
-                  id="payment_date"
-                  value={formData.payment_date}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                  required
-                />
+                >
+                  <option value="">Select a package</option>
+                  {packages.map(pkg => (
+                    <option key={pkg.package_number} value={pkg.package_number}>
+                      {pkg.package_name} - {pkg.package_price.toLocaleString()} RWF
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex justify-end">
@@ -124,7 +131,7 @@ function PaymentManager() {
                 type="submit"
                 className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Record Payment
+                Create Service Package
               </button>
             </div>
           </form>
@@ -134,7 +141,7 @@ function PaymentManager() {
       {/* Table */}
       <div className="bg-white shadow rounded-lg">
         <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg font-medium text-gray-900">Payment History</h3>
+          <h3 className="text-lg font-medium text-gray-900">Service Packages</h3>
         </div>
         <div className="border-t border-gray-200">
           <div className="overflow-x-auto">
@@ -154,27 +161,27 @@ function PaymentManager() {
                     Package
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount Paid
+                    Price
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {payments.map((payment) => (
-                  <tr key={payment.payment_number}>
+                {servicePackages.map((sp) => (
+                  <tr key={sp.record_number}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(payment.payment_date).toLocaleDateString()}
+                      {new Date(sp.service_date).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {payment.plate_number}
+                      {sp.plate_number}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {payment.driver_name}
+                      {sp.driver_name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {payment.package_name}
+                      {sp.package_name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {payment.amount_paid.toLocaleString()} RWF
+                      {sp.package_price.toLocaleString()} RWF
                     </td>
                   </tr>
                 ))}
@@ -187,4 +194,4 @@ function PaymentManager() {
   );
 }
 
-export default PaymentManager; 
+export default ServicePackageManager; 

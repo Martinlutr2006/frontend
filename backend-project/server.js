@@ -16,13 +16,27 @@ const db = mysql.createConnection({
   host: "localhost",
   user: "root",
   password: "",
-  database: "CRPMS",
+  database: "cwsms",
 });
 
 db.connect((err) => {
   if (err) throw err;
-  console.log("✅ MySQL connected");
+  console.log("✅ MySQL connected to CWSMS database");
 });
+
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) return res.status(401).json({ message: "Access denied" });
+  
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: "Invalid token" });
+    req.user = user;
+    next();
+  });
+};
 
 // Register
 app.post("/register", (req, res) => {
@@ -45,9 +59,7 @@ app.post("/register", (req, res) => {
           [username, hash],
           (err, result) => {
             if (err) return res.status(500).json(err);
-            res
-              .status(201)
-              .json({ message: "User registered", id: result.insertId });
+            res.status(201).json({ message: "User registered", id: result.insertId });
           }
         );
       });
@@ -70,364 +82,100 @@ app.post("/login", (req, res) => {
       const user = result[0];
       bcrypt.compare(password, user.password, (err, match) => {
         if (err) return res.status(500).json(err);
-        if (!match)
-          return res.status(401).json({ message: "Invalid password" });
+        if (!match) return res.status(401).json({ message: "Invalid password" });
 
         const token = jwt.sign(
           { id: user.user_id, username: user.username },
-          process.env.JWT_SECRET,
+          process.env.JWT_SECRET || 'your-secret-key',
           { expiresIn: "2d" }
         );
 
-        res.json({ message: "Login successful", token });
+        const { password: _, ...userData } = user;
+        res.json({
+          message: "Login successful",
+          token,
+          user: userData
+        });
       });
     }
   );
 });
 
-// Department routes
-app.post("/departments", (req, res) => {
-  const { departmentCode, departmentName, grossSalary } = req.body;
+// Car routes
+app.post("/cars", authenticateToken, (req, res) => {
+  const { plate_number, car_type, car_size, driver_name, driver_phone } = req.body;
+  
   db.query(
-    "INSERT INTO Department (departmentCode, departmentName, grossSalary) VALUES (?, ?, ?)",
-    [departmentCode, departmentName, grossSalary],
+    "INSERT INTO cars (plate_number, car_type, car_size, driver_name, driver_phone) VALUES (?, ?, ?, ?, ?)",
+    [plate_number, car_type, car_size, driver_name, driver_phone],
     (err, result) => {
       if (err) return res.status(500).json(err);
-      res.json({ message: "Department added", id: result.insertId });
+      res.status(201).json({ message: "Car added", id: result.insertId });
     }
   );
 });
 
-app.get("/departments", (req, res) => {
-  db.query("SELECT * FROM Department", (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
-// Update department by ID
-app.put("/departments/:id", (req, res) => {
-  const { id } = req.params;
-  const { departmentCode, departmentName, grossSalary } = req.body;
-  const sql = "UPDATE department SET departmentCode = ?, departmentName = ?, grossSalary = ? WHERE id = ?";
-  db.query(sql, [departmentCode, departmentName, grossSalary, id], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: "Department updated" });
-  });
-});
-
-// Delete department by ID
-app.delete("/departments/:id", (req, res) => {
-  const { id } = req.params;
-  const sql = "DELETE FROM department WHERE id = ?";
-  db.query(sql, [id], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: "Department deleted" });
-  });
-});
-
-// Employee routes
-app.post("/employees", (req, res) => {
-  const {
-    employeeNumber,
-    firstName,
-    lastName,
-    position,
-    address,
-    telephone,
-    departmentId,
-  } = req.body;
-
-  db.query(
-    `INSERT INTO Employee 
-      (employeeNumber, firstName, lastName, position, address, telephone, departmentId) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      employeeNumber,
-      firstName,
-      lastName,
-      position,
-      address,
-      telephone,
-      departmentId,
-    ],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Employee added", id: result.insertId });
-    }
-  );
-});
-
-app.get("/employees", (req, res) => {
-  db.query(
-    `SELECT e.*, d.departmentName 
-     FROM Employee e 
-     JOIN Department d ON e.departmentId = d.id`,
-    (err, results) => {
-      if (err) return res.status(500).json(err);
-      res.json(results);
-    }
-  );
-});
-// Add Employee
-app.post("/employees", (req, res) => {
-  const {
-    employeeNumber,
-    firstName,
-    lastName,
-    position,
-    address,
-    telephone,
-    departmentId,
-  } = req.body;
-  if (
-    !employeeNumber ||
-    !firstName ||
-    !lastName ||
-    !position ||
-    !address ||
-    !telephone ||
-    !departmentId
-  ) {
-    return res.status(400).json({ error: "All fields are required" });
-  }
-  // Insert into DB (example using some ORM or SQL query)
-  // db.query('INSERT INTO employees ...', [...], (err, result) => { ... });
-  res.status(201).json({ message: "Employee added successfully" });
-});
-
-// Update Employee
-app.put("/employees/:id", (req, res) => {
-  const { id } = req.params;
-  const {
-    employeeNumber,
-    firstName,
-    lastName,
-    position,
-    address,
-    telephone,
-    departmentId,
-  } = req.body;
-
-  const query = `
-    UPDATE Employee SET 
-      employeeNumber = ?,
-      firstName = ?,
-      lastName = ?,
-      position = ?,
-      address = ?,
-      telephone = ?,
-      departmentId = ?
-    WHERE id = ?
-  `;
-
-  db.query(
-    query,
-    [
-      employeeNumber,
-      firstName,
-      lastName,
-      position,
-      address,
-      telephone,
-      departmentId,
-      id,
-    ],
-    (err, result) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: "Failed to update employee" });
-      }
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: "Employee not found" });
-      }
-      res.json({ message: "Employee updated successfully" });
-    }
-  );
-});
-// In your server.js or routes file
-
-// DELETE /employees/:id - Delete an employee by id
-app.delete('/employees/:id', (req, res) => {
-  const employeeId = req.params.id;
-
-  const sql = 'DELETE FROM employee WHERE id = ?';
-  db.query(sql, [employeeId], (err, result) => {
-    if (err) {
-      console.error("Error deleting employee:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "Employee not found" });
-    }
-    res.json({ message: "Employee deleted successfully" });
-  });
-});
-
-// Salary routes
-app.post("/salaries", (req, res) => {
-  const { totalDeduction, netSalary, month, employeeId } = req.body;
-  db.query(
-    `INSERT INTO Salary (totalDeduction, netSalary, month, employeeId)
-     VALUES (?, ?, ?, ?)`,
-    [totalDeduction, netSalary, month, employeeId],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Salary record added", id: result.insertId });
-    }
-  );
-});
-
-app.get("/salaries", (req, res) => {
-  db.query(
-    `SELECT s.*, e.firstName, e.lastName, e.position, d.departmentName 
-     FROM Salary s 
-     JOIN Employee e ON s.employeeId = e.id 
-     JOIN Department d ON e.departmentId = d.id`,
-    (err, results) => {
-      if (err) return res.status(500).json(err);
-      res.json(results);
-    }
-  );
-});
-
-app.put("/salaries/:id", (req, res) => {
-  const { id } = req.params;
-  const { totalDeduction, netSalary, month } = req.body;
-  db.query(
-    `UPDATE Salary SET totalDeduction=?, netSalary=?, month=? WHERE id=?`,
-    [totalDeduction, netSalary, month, id],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Salary updated" });
-    }
-  );
-});
-
-app.delete("/salaries/:id", (req, res) => {
-  db.query("DELETE FROM Salary WHERE id=?", [req.params.id], (err) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: "Salary deleted" });
-  });
-});
-
-// Payroll report by month
-app.get("/payroll/:month", (req, res) => {
-  const { month } = req.params;
-  db.query(
-    `SELECT e.firstName, e.lastName, e.position, d.departmentName, s.netSalary
-     FROM Salary s
-     JOIN Employee e ON s.employeeId = e.id
-     JOIN Department d ON e.departmentId = d.id
-     WHERE s.month = ?`,
-    [month],
-    (err, results) => {
-      if (err) return res.status(500).json(err);
-      res.json(results);
-    }
-  );
-});
-
-// Services routes
-app.post("/services", (req, res) => {
-  const { service_code, service_name, price } = req.body;
-  db.query(
-    "INSERT INTO services (service_code, service_name, price) VALUES (?, ?, ?)",
-    [service_code, service_name, price],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Service added", service_code: service_code });
-    }
-  );
-});
-
-app.get("/services", (req, res) => {
-  db.query("SELECT * FROM services", (err, results) => {
-    if (err) return res.status(500).json(err);
-    res.json(results);
-  });
-});
-
-app.put("/services/:code", (req, res) => {
-  const { code } = req.params;
-  const { service_name, price } = req.body;
-  db.query(
-    "UPDATE services SET service_name = ?, price = ? WHERE service_code = ?",
-    [service_name, price, code],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Service updated" });
-    }
-  );
-});
-
-app.delete("/services/:code", (req, res) => {
-  const { code } = req.params;
-  db.query("DELETE FROM services WHERE service_code = ?", [code], (err) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: "Service deleted" });
-  });
-});
-
-// Cars routes
-app.post("/cars", (req, res) => {
-  const { platenumber, type, model, manufacturing_year, driver_phone, mechanic_name } = req.body;
-  db.query(
-    "INSERT INTO cars (platenumber, type, model, manufacturing_year, driver_phone, mechanic_name) VALUES (?, ?, ?, ?, ?, ?)",
-    [platenumber, type, model, manufacturing_year, driver_phone, mechanic_name],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Car added", platenumber: platenumber });
-    }
-  );
-});
-
-app.get("/cars", (req, res) => {
+app.get("/cars", authenticateToken, (req, res) => {
   db.query("SELECT * FROM cars", (err, results) => {
     if (err) return res.status(500).json(err);
     res.json(results);
   });
 });
 
-app.put("/cars/:platenumber", (req, res) => {
-  const { platenumber } = req.params;
-  const { type, model, manufacturing_year, driver_phone, mechanic_name } = req.body;
+app.put("/cars/:plate_number", authenticateToken, (req, res) => {
+  const { plate_number } = req.params;
+  const { car_type, car_size, driver_name, driver_phone } = req.body;
+  
   db.query(
-    "UPDATE cars SET type = ?, model = ?, manufacturing_year = ?, driver_phone = ?, mechanic_name = ? WHERE platenumber = ?",
-    [type, model, manufacturing_year, driver_phone, mechanic_name, platenumber],
-    (err) => {
+    "UPDATE cars SET car_type = ?, car_size = ?, driver_name = ?, driver_phone = ? WHERE plate_number = ?",
+    [car_type, car_size, driver_name, driver_phone, plate_number],
+    (err, result) => {
       if (err) return res.status(500).json(err);
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Car not found" });
       res.json({ message: "Car updated" });
     }
   );
 });
 
-app.delete("/cars/:platenumber", (req, res) => {
-  const { platenumber } = req.params;
-  db.query("DELETE FROM cars WHERE platenumber = ?", [platenumber], (err) => {
+app.delete("/cars/:plate_number", authenticateToken, (req, res) => {
+  const { plate_number } = req.params;
+  
+  // Delete car directly - related records will be deleted automatically due to CASCADE
+  db.query("DELETE FROM cars WHERE plate_number = ?", [plate_number], (err, result) => {
     if (err) return res.status(500).json(err);
-    res.json({ message: "Car deleted" });
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Car not found" });
+    res.json({ message: "Car and associated records deleted successfully" });
   });
 });
 
-// Service Records routes
-app.post("/servicerecords", (req, res) => {
-  const { servicedate, platenumber, service_code } = req.body;
+// Package routes
+app.get("/packages", authenticateToken, (req, res) => {
+  db.query("SELECT * FROM packages", (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
+
+// Service Package routes
+app.post("/service-packages", authenticateToken, (req, res) => {
+  const { service_date, package_number, plate_number } = req.body;
+  
   db.query(
-    "INSERT INTO servicerecords (servicedate, platenumber, service_code) VALUES (?, ?, ?)",
-    [servicedate, platenumber, service_code],
+    "INSERT INTO service_packages (service_date, package_number, plate_number) VALUES (?, ?, ?)",
+    [service_date, package_number, plate_number],
     (err, result) => {
       if (err) return res.status(500).json(err);
-      res.json({ message: "Service record added", recordnumber: result.insertId });
+      res.status(201).json({ message: "Service package added", id: result.insertId });
     }
   );
 });
 
-app.get("/servicerecords", (req, res) => {
+app.get("/service-packages", authenticateToken, (req, res) => {
   db.query(
-    `SELECT sr.*, c.type, c.model, s.service_name, s.price 
-     FROM servicerecords sr 
-     JOIN cars c ON sr.platenumber = c.platenumber 
-     JOIN services s ON sr.service_code = s.service_code`,
+    `SELECT sp.*, p.package_name, p.package_price, c.driver_name, c.driver_phone 
+     FROM service_packages sp 
+     JOIN packages p ON sp.package_number = p.package_number 
+     JOIN cars c ON sp.plate_number = c.plate_number`,
     (err, results) => {
       if (err) return res.status(500).json(err);
       res.json(results);
@@ -435,27 +183,27 @@ app.get("/servicerecords", (req, res) => {
   );
 });
 
-// Payments routes
-app.post("/payments", (req, res) => {
-  const { amount_paid, payment_date, recordnumber, user_id } = req.body;
+// Payment routes
+app.post("/payments", authenticateToken, (req, res) => {
+  const { amount_paid, payment_date, record_number } = req.body;
+  
   db.query(
-    "INSERT INTO payments (amount_paid, payment_date, recordnumber, user_id) VALUES (?, ?, ?, ?)",
-    [amount_paid, payment_date, recordnumber, user_id],
+    "INSERT INTO payments (amount_paid, payment_date, record_number) VALUES (?, ?, ?)",
+    [amount_paid, payment_date, record_number],
     (err, result) => {
       if (err) return res.status(500).json(err);
-      res.json({ message: "Payment added", paymentnumber: result.insertId });
+      res.status(201).json({ message: "Payment added", id: result.insertId });
     }
   );
 });
 
-app.get("/payments", (req, res) => {
+app.get("/payments", authenticateToken, (req, res) => {
   db.query(
-    `SELECT p.*, u.username, sr.servicedate, c.platenumber, s.service_name 
+    `SELECT p.*, sp.service_date, pk.package_name, c.plate_number, c.driver_name 
      FROM payments p 
-     JOIN users u ON p.user_id = u.user_id 
-     JOIN servicerecords sr ON p.recordnumber = sr.recordnumber 
-     JOIN cars c ON sr.platenumber = c.platenumber 
-     JOIN services s ON sr.service_code = s.service_code`,
+     JOIN service_packages sp ON p.record_number = sp.record_number 
+     JOIN packages pk ON sp.package_number = pk.package_number 
+     JOIN cars c ON sp.plate_number = c.plate_number`,
     (err, results) => {
       if (err) return res.status(500).json(err);
       res.json(results);
@@ -463,18 +211,40 @@ app.get("/payments", (req, res) => {
   );
 });
 
-// Payment report by date range
-app.get("/payments/report", (req, res) => {
+// Reports routes
+app.get("/reports/daily", authenticateToken, (req, res) => {
+  const { date } = req.query;
+  
+  db.query(
+    `SELECT 
+      COUNT(*) as total_services,
+      SUM(p.amount_paid) as total_revenue,
+      COUNT(CASE WHEN p.payment_number IS NULL THEN 1 END) as unpaid_services
+     FROM service_packages sp 
+     LEFT JOIN payments p ON sp.record_number = p.record_number 
+     WHERE DATE(sp.service_date) = ?`,
+    [date],
+    (err, results) => {
+      if (err) return res.status(500).json(err);
+      res.json(results[0]);
+    }
+  );
+});
+
+app.get("/reports/weekly", authenticateToken, (req, res) => {
   const { start_date, end_date } = req.query;
+  
   db.query(
-    `SELECT p.payment_date, u.username, c.platenumber, s.service_name, p.amount_paid
-     FROM payments p 
-     JOIN users u ON p.user_id = u.user_id 
-     JOIN servicerecords sr ON p.recordnumber = sr.recordnumber 
-     JOIN cars c ON sr.platenumber = c.platenumber 
-     JOIN services s ON sr.service_code = s.service_code
-     WHERE p.payment_date BETWEEN ? AND ?
-     ORDER BY p.payment_date`,
+    `SELECT 
+      DATE(sp.service_date) as date,
+      COUNT(*) as total_services,
+      SUM(p.amount_paid) as total_revenue,
+      COUNT(CASE WHEN p.payment_number IS NULL THEN 1 END) as unpaid_services
+     FROM service_packages sp 
+     LEFT JOIN payments p ON sp.record_number = p.record_number 
+     WHERE DATE(sp.service_date) BETWEEN ? AND ?
+     GROUP BY DATE(sp.service_date)
+     ORDER BY date`,
     [start_date, end_date],
     (err, results) => {
       if (err) return res.status(500).json(err);
@@ -485,4 +255,6 @@ app.get("/payments/report", (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3012;
-app.listen(PORT, () => console.log(`🚀 Server is running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
