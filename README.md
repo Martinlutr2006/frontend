@@ -4,11 +4,20 @@ A full-stack web application for managing a car wash business, built with React 
 
 ## Features
 
-- Car Management (Add, Edit, Delete cars)
+- User Authentication (Login/Register)
+- Car Management
+  - Add new cars with plate number, type, size, and driver details
+  - Edit existing car information
+  - Delete cars (with cascading deletion of related records)
 - Service Package Management
+  - Create and manage different wash service packages
+  - Assign packages to cars
 - Payment Tracking
-- User Authentication
-- Responsive Design
+  - Record payments for services
+  - Track payment status
+- Reporting
+  - View service and payment reports
+- Responsive Design with Tailwind CSS
 
 ## Prerequisites
 
@@ -21,18 +30,26 @@ Before you begin, ensure you have the following installed:
 
 ```
 car-wash-management/
-├── frontend-project/     # React frontend
+├── frontend-project/          # React frontend
 │   ├── src/
-│   │   ├── components/  # React components
-│   │   ├── api.js       # API configuration
-│   │   └── ...
+│   │   ├── components/       # React components
+│   │   │   ├── CarManager.js
+│   │   │   ├── PackageManager.js
+│   │   │   ├── PaymentManager.js
+│   │   │   ├── ServicePackageManager.js
+│   │   │   ├── Report.js
+│   │   │   ├── Login.js
+│   │   │   ├── Register.js
+│   │   │   └── Navbar.js
+│   │   ├── api.js           # API configuration
+│   │   └── App.js
+│   ├── tailwind.config.js
 │   └── package.json
 │
-└── backend-project/      # Node.js backend
-    ├── src/
-    │   ├── routes/      # API routes
-    │   ├── models/      # Database models
-    │   └── ...
+└── backend-project/          # Node.js backend
+    ├── server.js            # Main server file with all routes
+    ├── database.sql         # Database schema
+    ├── reset-database.js    # Database reset utility
     └── package.json
 ```
 
@@ -62,7 +79,7 @@ npm install
 DB_HOST=localhost
 DB_USER=your_mysql_username
 DB_PASSWORD=your_mysql_password
-DB_NAME=car_wash_db
+DB_NAME=cwsms
 JWT_SECRET=your_jwt_secret_key
 PORT=5000
 ```
@@ -71,11 +88,15 @@ PORT=5000
    - Open MySQL command line or MySQL Workbench
    - Create a new database:
    ```sql
-   CREATE DATABASE car_wash_db;
+   CREATE DATABASE cwsms;
    ```
    - Import the database schema:
    ```bash
-   mysql -u your_username -p car_wash_db < database.sql
+   mysql -u your_username -p cwsms < database.sql
+   ```
+   - (Optional) To reset the database:
+   ```bash
+   node reset-database.js
    ```
 
 5. Start the backend server:
@@ -112,49 +133,59 @@ The frontend application will run on `http://localhost:3000`
 ## Usage
 
 1. Open your browser and navigate to `http://localhost:3000`
-2. Log in with your credentials
+2. Register a new account or login with existing credentials
 3. Use the navigation menu to access different features:
-   - Car Management: Add, edit, and delete cars
-   - Service Packages: Manage service packages
-   - Payments: Track payments and transactions
+   - Cars: Manage car information
+   - Packages: Create and manage service packages
+   - Payments: Record and track payments
+   - Reports: View service and payment reports
 
 ## API Endpoints
 
 ### Authentication
-- POST `/api/auth/login` - User login
-- POST `/api/auth/register` - User registration
+- POST `/auth/register` - Register new user
+- POST `/auth/login` - User login
 
 ### Cars
-- GET `/api/cars` - Get all cars
-- POST `/api/cars` - Add new car
-- PUT `/api/cars/:plateNumber` - Update car
-- DELETE `/api/cars/:plateNumber` - Delete car
+- GET `/cars` - Get all cars
+- POST `/cars` - Add new car
+- PUT `/cars/:plateNumber` - Update car
+- DELETE `/cars/:plateNumber` - Delete car
 
 ### Service Packages
-- GET `/api/packages` - Get all packages
-- POST `/api/packages` - Add new package
-- PUT `/api/packages/:id` - Update package
-- DELETE `/api/packages/:id` - Delete package
+- GET `/packages` - Get all packages
+- POST `/packages` - Add new package
+- PUT `/packages/:id` - Update package
+- DELETE `/packages/:id` - Delete package
 
 ### Payments
-- GET `/api/payments` - Get all payments
-- POST `/api/payments` - Add new payment
-- GET `/api/payments/:id` - Get payment details
+- GET `/payments` - Get all payments
+- POST `/payments` - Add new payment
+- GET `/payments/report` - Get payment report
 
 ## Technologies Used
 
 ### Frontend
 - React.js
-- Tailwind CSS
-- Axios
-- React Router
+- Tailwind CSS for styling
+- Axios for API requests
+- React Router for navigation
 
 ### Backend
-- Node.js
-- Express.js
-- MySQL
-- JWT Authentication
-- bcrypt
+- Node.js with Express
+- MySQL database
+- JWT for authentication
+- bcrypt for password hashing
+
+## Database Schema
+
+The application uses a MySQL database with the following main tables:
+- users (authentication)
+- cars (vehicle information)
+- packages (service packages)
+- payments (payment records)
+
+All tables use appropriate foreign key constraints with CASCADE deletion where necessary.
 
 ## Contributing
 
@@ -166,7 +197,7 @@ The frontend application will run on `http://localhost:3000`
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## Support
 
