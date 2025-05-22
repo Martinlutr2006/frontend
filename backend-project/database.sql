@@ -1,13 +1,12 @@
 -- Drop database if exists and create new one
-DROP DATABASE IF EXISTS cwsms;
-CREATE DATABASE cwsms;
-USE cwsms;
+DROP DATABASE IF EXISTS sims;
+CREATE DATABASE sims;
+USE sims;
 
 -- Drop existing tables if they exist (in correct order due to foreign key constraints)
-DROP TABLE IF EXISTS payments;
-DROP TABLE IF EXISTS service_packages;
-DROP TABLE IF EXISTS packages;
-DROP TABLE IF EXISTS cars;
+DROP TABLE IF EXISTS stock_out;
+DROP TABLE IF EXISTS stock_in;
+DROP TABLE IF EXISTS spare_parts;
 DROP TABLE IF EXISTS users;
 
 -- Create users table for authentication
@@ -15,105 +14,82 @@ CREATE TABLE users (
     user_id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'user') DEFAULT 'user',
+    role ENUM('admin', 'stock_manager') DEFAULT 'stock_manager',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create cars table for vehicle information
-CREATE TABLE cars (
-    plate_number VARCHAR(20) PRIMARY KEY,
-    car_type ENUM('Sedan', 'SUV', 'Truck', 'Van', 'Other') NOT NULL,
-    car_size ENUM('Small', 'Medium', 'Large') NOT NULL,
-    driver_name VARCHAR(100) NOT NULL,
-    driver_phone VARCHAR(20) NOT NULL,
+-- Create spare_parts table
+CREATE TABLE spare_parts (
+    part_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    quantity INT NOT NULL DEFAULT 0,
+    unit_price DECIMAL(10,2) NOT NULL,
+    total_price DECIMAL(10,2) NOT NULL,
     status ENUM('Active', 'Inactive') DEFAULT 'Active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_driver_name (driver_name),
+    INDEX idx_name (name),
+    INDEX idx_category (category),
     INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create packages table for wash packages
-CREATE TABLE packages (
-    package_number INT PRIMARY KEY AUTO_INCREMENT,
-    package_name VARCHAR(100) NOT NULL,
-    package_description TEXT,
-    package_price DECIMAL(10,2) NOT NULL,
-    duration_minutes INT NOT NULL,
-    status ENUM('Active', 'Inactive') DEFAULT 'Active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_package_name (package_name),
-    INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Create service_packages table for service records
-CREATE TABLE service_packages (
-    record_number INT PRIMARY KEY AUTO_INCREMENT,
-    service_date DATETIME NOT NULL,
-    package_number INT NOT NULL,
-    plate_number VARCHAR(20) NOT NULL,
-    status ENUM('Pending', 'In Progress', 'Completed', 'Cancelled') DEFAULT 'Pending',
+-- Create stock_in table
+CREATE TABLE stock_in (
+    stock_in_id INT PRIMARY KEY AUTO_INCREMENT,
+    part_id INT NOT NULL,
+    stock_in_quantity INT NOT NULL,
+    stock_in_date DATETIME NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    total_price DECIMAL(10,2) NOT NULL,
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (package_number) REFERENCES packages(package_number) ON DELETE CASCADE,
-    FOREIGN KEY (plate_number) REFERENCES cars(plate_number) ON DELETE CASCADE,
-    INDEX idx_service_date (service_date),
-    INDEX idx_status (status)
+    FOREIGN KEY (part_id) REFERENCES spare_parts(part_id) ON DELETE CASCADE,
+    INDEX idx_stock_in_date (stock_in_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create payments table for payment records
-CREATE TABLE payments (
-    payment_number INT PRIMARY KEY AUTO_INCREMENT,
-    amount_paid DECIMAL(10,2) NOT NULL,
-    payment_date DATETIME NOT NULL,
-    record_number INT NOT NULL,
-    payment_method ENUM('Cash', 'Credit Card', 'Debit Card', 'Mobile Payment') NOT NULL,
-    payment_status ENUM('Pending', 'Completed', 'Failed', 'Refunded') DEFAULT 'Pending',
-    transaction_id VARCHAR(100),
+-- Create stock_out table
+CREATE TABLE stock_out (
+    stock_out_id INT PRIMARY KEY AUTO_INCREMENT,
+    part_id INT NOT NULL,
+    stock_out_quantity INT NOT NULL,
+    stock_out_unit_price DECIMAL(10,2) NOT NULL,
+    stock_out_total_price DECIMAL(10,2) NOT NULL,
+    stock_out_date DATETIME NOT NULL,
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (record_number) REFERENCES service_packages(record_number) ON DELETE CASCADE,
-    INDEX idx_payment_date (payment_date),
-    INDEX idx_payment_status (payment_status)
+    FOREIGN KEY (part_id) REFERENCES spare_parts(part_id) ON DELETE CASCADE,
+    INDEX idx_stock_out_date (stock_out_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (username, password, role) VALUES 
 ('admin', '$2b$10$8K1p/a0dR1U5bQYz8K1p/eK1p/a0dR1U5bQYz8K1p/a0dR1U5bQYz8K1', 'admin');
 
--- Insert sample packages
-INSERT INTO packages (package_name, package_description, package_price, duration_minutes) VALUES
-('Basic Wash', 'Exterior wash and vacuum cleaning', 50.00, 30),
-('Premium Wash', 'Exterior wash, vacuum, and interior cleaning with air freshener', 100.00, 60),
-('Deluxe Wash', 'Full service including wax, polish, and premium interior cleaning', 150.00, 90),
-('Express Wash', 'Quick exterior wash and basic vacuum', 30.00, 15),
-('SUV Special', 'Complete wash package designed for SUVs and larger vehicles', 120.00, 75);
+-- Insert sample spare parts
+INSERT INTO spare_parts (name, category, quantity, unit_price, total_price) VALUES
+('Brake Pads', 'Brakes', 50, 25.00, 1250.00),
+('Oil Filter', 'Filters', 100, 10.00, 1000.00),
+('Air Filter', 'Filters', 75, 15.00, 1125.00),
+('Spark Plugs', 'Engine', 200, 5.00, 1000.00),
+('Timing Belt', 'Engine', 30, 40.00, 1200.00);
 
--- Insert sample cars
-INSERT INTO cars (plate_number, car_type, car_size, driver_name, driver_phone) VALUES
-('ABC123', 'Sedan', 'Medium', 'John Doe', '1234567890'),
-('XYZ789', 'SUV', 'Large', 'Jane Smith', '0987654321'),
-('DEF456', 'Sedan', 'Small', 'Mike Johnson', '5551234567'),
-('GHI789', 'Truck', 'Large', 'Sarah Wilson', '5559876543'),
-('JKL012', 'Van', 'Large', 'Robert Brown', '5554567890');
+-- Insert sample stock in records
+INSERT INTO stock_in (part_id, stock_in_quantity, stock_in_date, unit_price, total_price) VALUES
+(1, 20, NOW(), 25.00, 500.00),
+(2, 50, DATE_SUB(NOW(), INTERVAL 1 DAY), 10.00, 500.00),
+(3, 25, DATE_SUB(NOW(), INTERVAL 2 DAY), 15.00, 375.00),
+(4, 100, DATE_SUB(NOW(), INTERVAL 3 DAY), 5.00, 500.00),
+(5, 15, DATE_SUB(NOW(), INTERVAL 4 DAY), 40.00, 600.00);
 
--- Insert sample service packages
-INSERT INTO service_packages (service_date, package_number, plate_number, status) VALUES
-(NOW(), 1, 'ABC123', 'Completed'),
-(DATE_SUB(NOW(), INTERVAL 1 DAY), 2, 'XYZ789', 'Completed'),
-(DATE_SUB(NOW(), INTERVAL 2 DAY), 3, 'DEF456', 'Completed'),
-(DATE_SUB(NOW(), INTERVAL 3 DAY), 4, 'GHI789', 'Completed'),
-(DATE_SUB(NOW(), INTERVAL 4 DAY), 5, 'JKL012', 'Completed');
-
--- Insert sample payments
-INSERT INTO payments (amount_paid, payment_date, record_number, payment_method, payment_status) VALUES
-(50.00, NOW(), 1, 'Cash', 'Completed'),
-(100.00, DATE_SUB(NOW(), INTERVAL 1 DAY), 2, 'Credit Card', 'Completed'),
-(150.00, DATE_SUB(NOW(), INTERVAL 2 DAY), 3, 'Debit Card', 'Completed'),
-(30.00, DATE_SUB(NOW(), INTERVAL 3 DAY), 4, 'Cash', 'Completed'),
-(120.00, DATE_SUB(NOW(), INTERVAL 4 DAY), 5, 'Mobile Payment', 'Completed'); 
+-- Insert sample stock out records
+INSERT INTO stock_out (part_id, stock_out_quantity, stock_out_unit_price, stock_out_total_price, stock_out_date) VALUES
+(1, 5, 25.00, 125.00, NOW()),
+(2, 10, 10.00, 100.00, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(3, 8, 15.00, 120.00, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(4, 20, 5.00, 100.00, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+(5, 3, 40.00, 120.00, DATE_SUB(NOW(), INTERVAL 4 DAY)); 

@@ -1,3 +1,7 @@
+-- Database: SIMS
+CREATE DATABASE IF NOT EXISTS SIMS;
+USE SIMS;
+
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS payments;
 DROP TABLE IF EXISTS service_packages;
@@ -58,9 +62,52 @@ CREATE TABLE payments (
     FOREIGN KEY (record_number) REFERENCES service_packages(record_number)
 );
 
+-- Spare_Part table
+CREATE TABLE IF NOT EXISTS Spare_Part (
+    spare_part_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    quantity INT NOT NULL DEFAULT 0,
+    unit_price DECIMAL(10,2) NOT NULL,
+    total_price DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Stock_In table
+CREATE TABLE IF NOT EXISTS Stock_In (
+    stock_in_id INT PRIMARY KEY AUTO_INCREMENT,
+    spare_part_id INT NOT NULL,
+    stock_in_quantity INT NOT NULL,
+    stock_in_date DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (spare_part_id) REFERENCES Spare_Part(spare_part_id)
+);
+
+-- Stock_Out table
+CREATE TABLE IF NOT EXISTS Stock_Out (
+    stock_out_id INT PRIMARY KEY AUTO_INCREMENT,
+    spare_part_id INT NOT NULL,
+    stock_out_quantity INT NOT NULL,
+    stock_out_unit_price DECIMAL(10,2) NOT NULL,
+    stock_out_total_price DECIMAL(10,2) NOT NULL,
+    stock_out_date DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (spare_part_id) REFERENCES Spare_Part(spare_part_id)
+);
+
+-- Users table for authentication
+CREATE TABLE IF NOT EXISTS Users (
+    user_id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Insert default admin user (password: admin123)
-INSERT INTO users (username, password) VALUES 
-('admin', '$2b$10$8K1p/a0dR1U5bQYz8K1p/eK1p/a0dR1U5bQYz8K1p/a0dR1U5bQYz8K1');
+INSERT INTO Users (username, password, role) 
+VALUES ('admin', '$2b$10$YourHashedPasswordHere', 'admin');
 
 -- Insert some sample packages
 INSERT INTO packages (package_name, package_description, package_price) VALUES

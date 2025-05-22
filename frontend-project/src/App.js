@@ -3,10 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Navbar from './components/Navbar';
 import Login from './components/Login';
 import Register from './components/Register';
-import CarManager from './components/CarManager';
-import PackageManager from './components/PackageManager';
-import ServicePackageManager from './components/ServicePackageManager';
-import PaymentManager from './components/PaymentManager';
+import SparePartManager from './components/SparePartManager';
+import StockInManager from './components/StockInManager';
+import StockOutManager from './components/StockOutManager';
 import Report from './components/Report';
 import './App.css';
 
@@ -67,13 +66,12 @@ function App() {
         <Navbar user={user} onLogout={handleLogout} />
         <div className="container mx-auto px-4 py-8">
           <Routes>
-            <Route path="/" element={<Navigate to="/cars" replace />} />
-            <Route path="/cars" element={<CarManager />} />
-            <Route path="/packages" element={<PackageManager />} />
-            <Route path="/service-packages" element={<ServicePackageManager />} />
-            <Route path="/payments" element={<PaymentManager />} />
+            <Route path="/" element={<Navigate to="/spare-parts" replace />} />
+            <Route path="/spare-parts" element={<SparePartManager />} />
+            <Route path="/stock-in" element={<StockInManager />} />
+            <Route path="/stock-out" element={<StockOutManager />} />
             <Route path="/reports" element={<Report />} />
-            <Route path="*" element={<Navigate to="/cars" replace />} />
+            <Route path="*" element={<Navigate to="/spare-parts" replace />} />
           </Routes>
         </div>
       </div>
