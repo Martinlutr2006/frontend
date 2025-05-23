@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
 import { API_ENDPOINTS } from '../config';
 
 const ParkingRecords = () => {
@@ -28,11 +27,9 @@ const ParkingRecords = () => {
             if (response.ok) {
                 const data = await response.json();
                 setRecords(data);
-            } else {
-                toast.error('Failed to fetch parking records');
             }
         } catch (error) {
-            toast.error('Error fetching parking records');
+            console.error('Error fetching parking records:', error);
         } finally {
             setLoading(false);
         }
@@ -40,7 +37,7 @@ const ParkingRecords = () => {
 
     const fetchCars = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/cars', {
+            const response = await fetch(API_ENDPOINTS.CARS, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -50,13 +47,13 @@ const ParkingRecords = () => {
                 setCars(data);
             }
         } catch (error) {
-            toast.error('Error fetching cars');
+            console.error('Error fetching cars:', error);
         }
     };
 
     const fetchSlots = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/parking-slots', {
+            const response = await fetch(API_ENDPOINTS.PARKING_SLOTS, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -66,7 +63,7 @@ const ParkingRecords = () => {
                 setSlots(data.filter(slot => slot.slot_status === 'available'));
             }
         } catch (error) {
-            toast.error('Error fetching parking slots');
+            console.error('Error fetching parking slots:', error);
         }
     };
 
@@ -82,16 +79,12 @@ const ParkingRecords = () => {
                 body: JSON.stringify(formData)
             });
 
-            const data = await response.json();
             if (response.ok) {
-                toast.success('Parking record created successfully');
                 setFormData({ plate_number: '', slot_number: '' });
                 fetchRecords();
-            } else {
-                toast.error(data.message || 'Failed to create parking record');
             }
         } catch (error) {
-            toast.error('Error creating parking record');
+            console.error('Error creating parking record:', error);
         }
     };
 
@@ -104,15 +97,11 @@ const ParkingRecords = () => {
                 }
             });
 
-            const data = await response.json();
             if (response.ok) {
-                toast.success('Exit recorded successfully');
                 fetchRecords();
-            } else {
-                toast.error(data.message || 'Failed to record exit');
             }
         } catch (error) {
-            toast.error('Error recording exit');
+            console.error('Error recording exit:', error);
         }
     };
 

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
 import { API_ENDPOINTS } from '../config';
 
 const Reports = () => {
@@ -32,11 +31,9 @@ const Reports = () => {
             if (response.ok) {
                 const data = await response.json();
                 setReports(data);
-            } else {
-                toast.error('Failed to fetch reports');
             }
         } catch (error) {
-            toast.error('Error fetching reports');
+            console.error('Error fetching reports:', error);
         } finally {
             setLoading(false);
         }
@@ -109,7 +106,7 @@ const Reports = () => {
                             {reports.dailyRevenue.map((day) => (
                                 <tr key={day.payment_date} className="border-b">
                                     <td className="px-4 py-2">{new Date(day.payment_date).toLocaleDateString()}</td>
-                                    <td className="px-4 py-2">${day.total_revenue.toFixed(2)}</td>
+                                    <td className="px-4 py-2">{day.total_revenue.toLocaleString('en-RW')} RWF</td>
                                     <td className="px-4 py-2">{day.total_transactions}</td>
                                 </tr>
                             ))}
@@ -162,7 +159,7 @@ const Reports = () => {
             <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-blue-100 p-4 rounded-lg">
                     <p className="text-lg font-semibold text-blue-800">
-                        Total Revenue: ${reports.dailyRevenue.reduce((sum, day) => sum + day.total_revenue, 0).toFixed(2)}
+                        Total Revenue: {reports.dailyRevenue.reduce((sum, day) => sum + day.total_revenue, 0).toLocaleString('en-RW')} RWF
                     </p>
                 </div>
                 <div className="bg-green-100 p-4 rounded-lg">

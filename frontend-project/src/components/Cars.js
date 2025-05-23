@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
 import { API_ENDPOINTS } from '../config';
 
 const Cars = () => {
@@ -25,11 +24,9 @@ const Cars = () => {
             if (response.ok) {
                 const data = await response.json();
                 setCars(data);
-            } else {
-                toast.error('Failed to fetch cars');
             }
         } catch (error) {
-            toast.error('Error fetching cars');
+            console.error('Error fetching cars:', error);
         } finally {
             setLoading(false);
         }
@@ -47,16 +44,12 @@ const Cars = () => {
                 body: JSON.stringify(formData)
             });
 
-            const data = await response.json();
             if (response.ok) {
-                toast.success('Car registered successfully');
                 setFormData({ plate_number: '', driver_name: '', phone_number: '' });
                 fetchCars();
-            } else {
-                toast.error(data.message || 'Failed to register car');
             }
         } catch (error) {
-            toast.error('Error registering car');
+            console.error('Error registering car:', error);
         }
     };
 

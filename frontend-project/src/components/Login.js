@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import { API_ENDPOINTS } from '../config';
 
 const Login = () => {
@@ -26,13 +25,10 @@ const Login = () => {
       if (response.ok) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        toast.success('Login successful');
         navigate('/dashboard');
-      } else {
-        toast.error(data.message || 'Login failed');
       }
     } catch (error) {
-      toast.error('Error connecting to server');
+      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }
@@ -99,6 +95,16 @@ const Login = () => {
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
                 {loading ? 'Signing in...' : 'Sign in'}
+              </button>
+            </div>
+
+            <div className="text-sm text-center">
+              <button
+                type="button"
+                onClick={() => navigate('/register')}
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Don't have an account? Register here
               </button>
             </div>
           </form>

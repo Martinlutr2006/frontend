@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
 import { API_ENDPOINTS } from '../config';
 
 const ParkingSlots = () => {
@@ -20,11 +19,9 @@ const ParkingSlots = () => {
             if (response.ok) {
                 const data = await response.json();
                 setSlots(data);
-            } else {
-                toast.error('Failed to fetch parking slots');
             }
         } catch (error) {
-            toast.error('Error fetching parking slots');
+            console.error('Error fetching parking slots:', error);
         } finally {
             setLoading(false);
         }
@@ -42,14 +39,10 @@ const ParkingSlots = () => {
             });
 
             if (response.ok) {
-                toast.success('Slot status updated');
                 fetchSlots();
-            } else {
-                const data = await response.json();
-                toast.error(data.message || 'Failed to update slot status');
             }
         } catch (error) {
-            toast.error('Error updating slot status');
+            console.error('Error updating slot status:', error);
         }
     };
 

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
 import { API_ENDPOINTS } from '../config';
 
 const Payments = () => {
@@ -26,11 +25,9 @@ const Payments = () => {
             if (response.ok) {
                 const data = await response.json();
                 setPayments(data);
-            } else {
-                toast.error('Failed to fetch payments');
             }
         } catch (error) {
-            toast.error('Error fetching payments');
+            console.error('Error fetching payments:', error);
         } finally {
             setLoading(false);
         }
@@ -38,7 +35,7 @@ const Payments = () => {
 
     const fetchActiveRecords = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/parking-records/active', {
+            const response = await fetch(API_ENDPOINTS.ACTIVE_PARKING, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -48,7 +45,7 @@ const Payments = () => {
                 setRecords(data);
             }
         } catch (error) {
-            toast.error('Error fetching active records');
+            console.error('Error fetching active records:', error);
         }
     };
 
@@ -64,17 +61,13 @@ const Payments = () => {
                 body: JSON.stringify(formData)
             });
 
-            const data = await response.json();
             if (response.ok) {
-                toast.success('Payment recorded successfully');
                 setFormData({ record_id: '', amount_paid: '' });
                 fetchPayments();
                 fetchActiveRecords();
-            } else {
-                toast.error(data.message || 'Failed to record payment');
             }
         } catch (error) {
-            toast.error('Error recording payment');
+            console.error('Error recording payment:', error);
         }
     };
 
@@ -88,8 +81,8 @@ const Payments = () => {
     const calculateAmount = (record) => {
         const duration = Math.floor((Date.now() - new Date(record.entry_time).getTime()) / 60000);
         const hours = Math.ceil(duration / 60);
-        // Assuming rate is $2 per hour
-        return (hours * 2).toFixed(2);
+        // Assuming rate is 2000 RWF per hour
+        return (hours * 2000).toFixed(0);
     };
 
     if (loading) {
@@ -128,13 +121,13 @@ const Payments = () => {
                 </div>
                 <div className="mb-6">
                     <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="amount_paid">
-                        Amount ($)
+                        Amount (RWF)
                     </label>
                     <input
                         className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                         id="amount_paid"
                         type="number"
-                        step="0.01"
+                        step="100"
                         min="0"
                         name="amount_paid"
                         value={formData.amount_paid}
@@ -172,7 +165,7 @@ const Payments = () => {
                                     <td className="px-4 py-2">{payment.payment_id}</td>
                                     <td className="px-4 py-2">{payment.plate_number}</td>
                                     <td className="px-4 py-2">{payment.slot_number}</td>
-                                    <td className="px-4 py-2">${payment.amount_paid.toFixed(2)}</td>
+                                    <td className="px-4 py-2">{payment.amount_paid.toLocaleString('en-RW')} RWF</td>
                                     <td className="px-4 py-2">
                                         {new Date(payment.payment_date).toLocaleString()}
                                     </td>
@@ -186,7 +179,7 @@ const Payments = () => {
                 <div className="mt-8 grid grid-cols-2 gap-4">
                     <div className="bg-blue-100 p-4 rounded-lg">
                         <p className="text-lg font-semibold text-blue-800">
-                            Total Payments: ${payments.reduce((sum, payment) => sum + payment.amount_paid, 0).toFixed(2)}
+                            Total Payments: {payments.reduce((sum, payment) => sum + payment.amount_paid, 0).toLocaleString('en-RW')} RWF
                         </p>
                     </div>
                     <div className="bg-green-100 p-4 rounded-lg">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
+import { API_ENDPOINTS } from '../config';
 import { 
     BuildingOfficeIcon, 
     TruckIcon, 
@@ -26,7 +26,7 @@ const Dashboard = () => {
 
     const fetchStats = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/dashboard/stats', {
+            const response = await fetch(API_ENDPOINTS.DASHBOARD_STATS, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -34,23 +34,13 @@ const Dashboard = () => {
             if (response.ok) {
                 const data = await response.json();
                 setStats(data);
-            } else {
-                toast.error('Failed to fetch dashboard statistics');
             }
         } catch (error) {
-            toast.error('Error fetching dashboard statistics');
+            console.error('Error fetching dashboard statistics:', error);
         } finally {
             setLoading(false);
         }
     };
-
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-            </div>
-        );
-    }
 
     const statCards = [
         {
@@ -79,7 +69,7 @@ const Dashboard = () => {
         },
         {
             name: 'Total Revenue',
-            value: `$${stats.totalRevenue.toFixed(2)}`,
+            value: `${stats.totalRevenue.toLocaleString('en-RW')} RWF`,
             icon: CurrencyDollarIcon,
             color: 'bg-indigo-500'
         },
@@ -91,27 +81,35 @@ const Dashboard = () => {
         }
     ];
 
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            </div>
+        );
+    }
+
     return (
         <div className="container mx-auto px-4 py-8">
-            <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
+            <h2 className="text-2xl font-bold mb-6">Dashboard Overview</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {statCards.map((stat) => (
-                    <div key={stat.name} className="bg-white rounded-lg shadow-md p-6">
-                        <div className="flex items-center">
-                            <div className={`p-3 rounded-full ${stat.color} bg-opacity-10`}>
-                                <stat.icon className={`h-6 w-6 ${stat.color.replace('bg-', 'text-')}`} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {statCards.map((stat, index) => (
+                    <div
+                        key={index}
+                        className={`${stat.color} rounded-lg shadow-md p-6 text-white`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium opacity-80">{stat.name}</p>
+                                <p className="text-2xl font-bold mt-1">{stat.value}</p>
                             </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                                <p className="text-lg font-semibold text-gray-900">{stat.value}</p>
-                            </div>
+                            <stat.icon className="h-8 w-8 opacity-80" />
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* Quick Actions */}
             <div className="mt-8 bg-white rounded-lg shadow-md p-6">
                 <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
