@@ -16,12 +16,12 @@ const db = mysql.createConnection({
   host: "localhost",
   user: "root",
   password: "",
-  database: "sims",
+  database: "PSSMS",
 });
 
 db.connect((err) => {
   if (err) throw err;
-  console.log("✅ MySQL connected to SIMS database");
+  console.log("✅ MySQL connected to PSSMS database");
 });
 
 // Authentication middleware
@@ -31,7 +31,7 @@ const authenticateToken = (req, res, next) => {
   
   if (!token) return res.status(401).json({ message: "Access denied" });
   
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
     if (err) return res.status(403).json({ message: "Invalid token" });
     req.user = user;
     next();
@@ -101,132 +101,90 @@ app.post("/login", (req, res) => {
   );
 });
 
-// Spare Parts routes
-app.post("/spare-parts", authenticateToken, (req, res) => {
-  const { name, category, quantity, unit_price } = req.body;
-  const total_price = quantity * unit_price;
-  
-  db.query(
-    "INSERT INTO spare_parts (name, category, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)",
-    [name, category, quantity, unit_price, total_price],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      res.status(201).json({ message: "Spare part added", id: result.insertId });
-    }
-  );
-});
-
-app.get("/spare-parts", authenticateToken, (req, res) => {
-  db.query("SELECT * FROM spare_parts", (err, results) => {
+// Parking Slots routes
+app.get("/parking-slots", authenticateToken, (req, res) => {
+  db.query("SELECT * FROM parking_slots", (err, results) => {
     if (err) return res.status(500).json(err);
     res.json(results);
   });
 });
 
-app.put("/spare-parts/:part_id", authenticateToken, (req, res) => {
-  const { part_id } = req.params;
-  const { name, category, quantity, unit_price } = req.body;
-  const total_price = quantity * unit_price;
+app.put("/parking-slots/:slot_number", authenticateToken, (req, res) => {
+  const { slot_number } = req.params;
+  const { slot_status } = req.body;
   
   db.query(
-    "UPDATE spare_parts SET name = ?, category = ?, quantity = ?, unit_price = ?, total_price = ? WHERE part_id = ?",
-    [name, category, quantity, unit_price, total_price, part_id],
+    "UPDATE parking_slots SET slot_status = ? WHERE slot_number = ?",
+    [slot_status, slot_number],
     (err, result) => {
       if (err) return res.status(500).json(err);
-      if (result.affectedRows === 0) return res.status(404).json({ message: "Spare part not found" });
-      res.json({ message: "Spare part updated" });
+      if (result.affectedRows === 0) return res.status(404).json({ message: "Slot not found" });
+      res.json({ message: "Slot status updated" });
     }
   );
 });
 
-// Stock In routes
-app.post("/stock-in", authenticateToken, (req, res) => {
-  const { part_id, stock_in_quantity, stock_in_date, unit_price } = req.body;
-  const total_price = stock_in_quantity * unit_price;
+// Cars routes
+app.post("/cars", authenticateToken, (req, res) => {
+  const { plate_number, driver_name, phone_number } = req.body;
   
-  // Start transaction
-  db.beginTransaction(err => {
-    if (err) return res.status(500).json(err);
-    
-    // Insert stock in record
-    db.query(
-      "INSERT INTO stock_in (part_id, stock_in_quantity, stock_in_date, unit_price, total_price) VALUES (?, ?, ?, ?, ?)",
-      [part_id, stock_in_quantity, stock_in_date, unit_price, total_price],
-      (err, result) => {
-        if (err) {
-          return db.rollback(() => res.status(500).json(err));
+  db.query(
+    "INSERT INTO cars (plate_number, driver_name, phone_number) VALUES (?, ?, ?)",
+    [plate_number, driver_name, phone_number],
+    (err, result) => {
+      if (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          return res.status(409).json({ message: "Car already registered" });
         }
-        
-        // Update spare part quantity and total price
-        db.query(
-          "UPDATE spare_parts SET quantity = quantity + ?, total_price = quantity * unit_price WHERE part_id = ?",
-          [stock_in_quantity, part_id],
-          (err, result) => {
-            if (err) {
-              return db.rollback(() => res.status(500).json(err));
-            }
-            
-            db.commit(err => {
-              if (err) {
-                return db.rollback(() => res.status(500).json(err));
-              }
-              res.status(201).json({ message: "Stock in record added" });
-            });
-          }
-        );
+        return res.status(500).json(err);
       }
-    );
+      res.status(201).json({ message: "Car registered successfully" });
+    }
+  );
+});
+
+app.get("/cars", authenticateToken, (req, res) => {
+  db.query("SELECT * FROM cars", (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
   });
 });
 
-app.get("/stock-in", authenticateToken, (req, res) => {
-  db.query(
-    `SELECT si.*, sp.name as part_name, sp.category 
-     FROM stock_in si 
-     JOIN spare_parts sp ON si.part_id = sp.part_id 
-     ORDER BY si.stock_in_date DESC`,
-    (err, results) => {
-      if (err) return res.status(500).json(err);
-      res.json(results);
-    }
-  );
-});
-
-// Stock Out routes
-app.post("/stock-out", authenticateToken, (req, res) => {
-  const { part_id, stock_out_quantity, stock_out_unit_price, stock_out_date } = req.body;
-  const stock_out_total_price = stock_out_quantity * stock_out_unit_price;
+// Parking Records routes
+app.post("/parking-records", authenticateToken, (req, res) => {
+  const { plate_number, slot_number } = req.body;
+  const entry_time = new Date();
   
   // Start transaction
   db.beginTransaction(err => {
     if (err) return res.status(500).json(err);
     
-    // Check if enough quantity is available
+    // Check if slot is available
     db.query(
-      "SELECT quantity FROM spare_parts WHERE part_id = ?",
-      [part_id],
+      "SELECT slot_status FROM parking_slots WHERE slot_number = ?",
+      [slot_number],
       (err, results) => {
         if (err) {
           return db.rollback(() => res.status(500).json(err));
         }
         
-        if (results[0].quantity < stock_out_quantity) {
-          return db.rollback(() => res.status(400).json({ message: "Insufficient stock" }));
+        if (results[0].slot_status !== 'available') {
+          return db.rollback(() => res.status(400).json({ message: "Slot is not available" }));
         }
         
-        // Insert stock out record
+        // Create parking record
         db.query(
-          "INSERT INTO stock_out (part_id, stock_out_quantity, stock_out_unit_price, stock_out_total_price, stock_out_date) VALUES (?, ?, ?, ?, ?)",
-          [part_id, stock_out_quantity, stock_out_unit_price, stock_out_total_price, stock_out_date],
+          "INSERT INTO parking_records (plate_number, slot_number, entry_time) VALUES (?, ?, ?)",
+          [plate_number, slot_number, entry_time],
           (err, result) => {
             if (err) {
               return db.rollback(() => res.status(500).json(err));
             }
             
-            // Update spare part quantity and total price
+            // Update slot status
             db.query(
-              "UPDATE spare_parts SET quantity = quantity - ?, total_price = quantity * unit_price WHERE part_id = ?",
-              [stock_out_quantity, part_id],
+              "UPDATE parking_slots SET slot_status = 'occupied' WHERE slot_number = ?",
+              [slot_number],
               (err, result) => {
                 if (err) {
                   return db.rollback(() => res.status(500).json(err));
@@ -236,7 +194,11 @@ app.post("/stock-out", authenticateToken, (req, res) => {
                   if (err) {
                     return db.rollback(() => res.status(500).json(err));
                   }
-                  res.status(201).json({ message: "Stock out record added" });
+                  res.status(201).json({ 
+                    message: "Parking record created",
+                    record_id: result.insertId,
+                    entry_time
+                  });
                 });
               }
             );
@@ -247,112 +209,50 @@ app.post("/stock-out", authenticateToken, (req, res) => {
   });
 });
 
-app.get("/stock-out", authenticateToken, (req, res) => {
-  db.query(
-    `SELECT so.*, sp.name as part_name, sp.category 
-     FROM stock_out so 
-     JOIN spare_parts sp ON so.part_id = sp.part_id 
-     ORDER BY so.stock_out_date DESC`,
-    (err, results) => {
-      if (err) return res.status(500).json(err);
-      res.json(results);
-    }
-  );
-});
+// Calculate parking fee (500 RWF per hour, minimum 1 hour)
+const calculateParkingFee = (duration) => {
+  const hours = Math.ceil(duration / 60); // Convert minutes to hours, round up
+  return Math.max(1, hours) * 500; // Minimum 1 hour charge
+};
 
-app.put("/stock-out/:stock_out_id", authenticateToken, (req, res) => {
-  const { stock_out_id } = req.params;
-  const { stock_out_quantity, stock_out_unit_price, stock_out_date } = req.body;
-  const stock_out_total_price = stock_out_quantity * stock_out_unit_price;
+app.put("/parking-records/:record_id/exit", authenticateToken, (req, res) => {
+  const { record_id } = req.params;
+  const exit_time = new Date();
   
   // Start transaction
   db.beginTransaction(err => {
     if (err) return res.status(500).json(err);
     
-    // Get the original stock out record
+    // Get parking record
     db.query(
-      "SELECT part_id, stock_out_quantity FROM stock_out WHERE stock_out_id = ?",
-      [stock_out_id],
+      "SELECT * FROM parking_records WHERE record_id = ? AND exit_time IS NULL",
+      [record_id],
       (err, results) => {
         if (err) {
           return db.rollback(() => res.status(500).json(err));
         }
         
         if (results.length === 0) {
-          return db.rollback(() => res.status(404).json({ message: "Stock out record not found" }));
-        }
-        
-        const originalRecord = results[0];
-        const quantityDifference = stock_out_quantity - originalRecord.stock_out_quantity;
-        
-        // Update stock out record
-        db.query(
-          "UPDATE stock_out SET stock_out_quantity = ?, stock_out_unit_price = ?, stock_out_total_price = ?, stock_out_date = ? WHERE stock_out_id = ?",
-          [stock_out_quantity, stock_out_unit_price, stock_out_total_price, stock_out_date, stock_out_id],
-          (err, result) => {
-            if (err) {
-              return db.rollback(() => res.status(500).json(err));
-            }
-            
-            // Update spare part quantity
-            db.query(
-              "UPDATE spare_parts SET quantity = quantity - ?, total_price = quantity * unit_price WHERE part_id = ?",
-              [quantityDifference, originalRecord.part_id],
-              (err, result) => {
-                if (err) {
-                  return db.rollback(() => res.status(500).json(err));
-                }
-                
-                db.commit(err => {
-                  if (err) {
-                    return db.rollback(() => res.status(500).json(err));
-                  }
-                  res.json({ message: "Stock out record updated" });
-                });
-              }
-            );
-          }
-        );
-      }
-    );
-  });
-});
-
-app.delete("/stock-out/:stock_out_id", authenticateToken, (req, res) => {
-  const { stock_out_id } = req.params;
-  
-  // Start transaction
-  db.beginTransaction(err => {
-    if (err) return res.status(500).json(err);
-    
-    // Get the stock out record
-    db.query(
-      "SELECT part_id, stock_out_quantity FROM stock_out WHERE stock_out_id = ?",
-      [stock_out_id],
-      (err, results) => {
-        if (err) {
-          return db.rollback(() => res.status(500).json(err));
-        }
-        
-        if (results.length === 0) {
-          return db.rollback(() => res.status(404).json({ message: "Stock out record not found" }));
+          return db.rollback(() => res.status(404).json({ message: "Record not found or already exited" }));
         }
         
         const record = results[0];
+        const duration = Math.round((exit_time - new Date(record.entry_time)) / (1000 * 60)); // Duration in minutes
+        const amount = calculateParkingFee(duration);
         
-        // Delete stock out record
+        // Update parking record
         db.query(
-          "DELETE FROM stock_out WHERE stock_out_id = ?",
-          [stock_out_id],
+          "UPDATE parking_records SET exit_time = ?, duration = ? WHERE record_id = ?",
+          [exit_time, duration, record_id],
           (err, result) => {
             if (err) {
               return db.rollback(() => res.status(500).json(err));
             }
             
-            // Update spare part quantity
+            // Update slot status
             db.query(
-              "UPDATE spare_parts SET quantity = quantity + ?, total_price = quantity * unit_price WHERE part_id = ?",
-              [record.stock_out_quantity, record.part_id],
+              "UPDATE parking_slots SET slot_status = 'available' WHERE slot_number = ?",
+              [record.slot_number],
               (err, result) => {
                 if (err) {
                   return db.rollback(() => res.status(500).json(err));
@@ -362,7 +262,11 @@ app.delete("/stock-out/:stock_out_id", authenticateToken, (req, res) => {
                   if (err) {
                     return db.rollback(() => res.status(500).json(err));
                   }
-                  res.json({ message: "Stock out record deleted" });
+                  res.json({ 
+                    message: "Exit recorded",
+                    duration,
+                    amount
+                  });
                 });
               }
             );
@@ -373,22 +277,38 @@ app.delete("/stock-out/:stock_out_id", authenticateToken, (req, res) => {
   });
 });
 
-// Reports routes
-app.get("/reports/daily-stock-status", authenticateToken, (req, res) => {
-  const { date } = req.query;
+// Payments routes
+app.post("/payments", authenticateToken, (req, res) => {
+  const { record_id, amount_paid } = req.body;
+  const payment_date = new Date();
   
   db.query(
-    `SELECT 
-      sp.name,
-      sp.quantity as stored_quantity,
-      COALESCE(SUM(so.stock_out_quantity), 0) as stock_out_quantity,
-      sp.quantity - COALESCE(SUM(so.stock_out_quantity), 0) as remaining_quantity
-     FROM spare_parts sp
-     LEFT JOIN stock_out so ON sp.part_id = so.part_id 
-     AND DATE(so.stock_out_date) = ?
-     GROUP BY sp.part_id, sp.name, sp.quantity
-     ORDER BY sp.name`,
-    [date],
+    "INSERT INTO payments (record_id, amount_paid, payment_date) VALUES (?, ?, ?)",
+    [record_id, amount_paid, payment_date],
+    (err, result) => {
+      if (err) return res.status(500).json(err);
+      res.status(201).json({ message: "Payment recorded" });
+    }
+  );
+});
+
+// Reports routes
+app.get("/reports/daily", authenticateToken, (req, res) => {
+  const { date } = req.query;
+  const start_date = new Date(date);
+  start_date.setHours(0, 0, 0, 0);
+  const end_date = new Date(date);
+  end_date.setHours(23, 59, 59, 999);
+  
+  db.query(
+    `SELECT pr.plate_number, c.driver_name, pr.entry_time, pr.exit_time, 
+            pr.duration, p.amount_paid, p.payment_date
+     FROM parking_records pr
+     JOIN cars c ON pr.plate_number = c.plate_number
+     LEFT JOIN payments p ON pr.record_id = p.record_id
+     WHERE pr.entry_time BETWEEN ? AND ?
+     ORDER BY pr.entry_time DESC`,
+    [start_date, end_date],
     (err, results) => {
       if (err) return res.status(500).json(err);
       res.json(results);
@@ -396,28 +316,121 @@ app.get("/reports/daily-stock-status", authenticateToken, (req, res) => {
   );
 });
 
-app.get("/reports/daily-stock-out", authenticateToken, (req, res) => {
-  const { date } = req.query;
-  
+// Get available slots count
+app.get("/parking-slots/available", authenticateToken, (req, res) => {
   db.query(
-    `SELECT 
-      so.*,
-      sp.name as part_name,
-      sp.category
-     FROM stock_out so
-     JOIN spare_parts sp ON so.part_id = sp.part_id
-     WHERE DATE(so.stock_out_date) = ?
-     ORDER BY so.stock_out_date DESC`,
-    [date],
+    "SELECT COUNT(*) as available_count FROM parking_slots WHERE slot_status = 'available'",
     (err, results) => {
       if (err) return res.status(500).json(err);
-      res.json(results);
+      res.json(results[0]);
     }
   );
+});
+
+// Dashboard Statistics
+app.get('/api/dashboard/stats', authenticateToken, (req, res) => {
+    // Get total and available parking slots
+    db.query(
+        'SELECT COUNT(*) as total, SUM(CASE WHEN slot_status = "available" THEN 1 ELSE 0 END) as available FROM parking_slots',
+        (err, slotsResult) => {
+            if (err) return res.status(500).json(err);
+
+            // Get total registered cars
+            db.query('SELECT COUNT(*) as total FROM cars', (err, carsResult) => {
+                if (err) return res.status(500).json(err);
+
+                // Get active parking records
+                db.query(
+                    'SELECT COUNT(*) as active FROM parking_records WHERE exit_time IS NULL',
+                    (err, activeResult) => {
+                        if (err) return res.status(500).json(err);
+
+                        // Get total revenue (in RWF)
+                        db.query(
+                            'SELECT COALESCE(SUM(amount_paid), 0) as total FROM payments',
+                            (err, revenueResult) => {
+                                if (err) return res.status(500).json(err);
+
+                                // Get average parking duration in minutes
+                                db.query(
+                                    `SELECT AVG(TIMESTAMPDIFF(MINUTE, entry_time, COALESCE(exit_time, NOW()))) as avg_duration 
+                                    FROM parking_records 
+                                    WHERE exit_time IS NOT NULL`,
+                                    (err, durationResult) => {
+                                        if (err) return res.status(500).json(err);
+
+                                        const stats = {
+                                            totalSlots: slotsResult[0].total || 0,
+                                            availableSlots: slotsResult[0].available || 0,
+                                            totalCars: carsResult[0].total || 0,
+                                            activeParking: activeResult[0].active || 0,
+                                            totalRevenue: revenueResult[0].total || 0,
+                                            averageDuration: Math.round(durationResult[0].avg_duration || 0)
+                                        };
+
+                                        res.json(stats);
+                                    }
+                                );
+                            }
+                        );
+                    }
+                );
+            });
+        }
+    );
+});
+
+// Get active parking records
+app.get("/api/parking-records/active", authenticateToken, (req, res) => {
+    db.query(
+        `SELECT pr.*, c.driver_name, c.phone_number, ps.slot_status
+         FROM parking_records pr
+         JOIN cars c ON pr.plate_number = c.plate_number
+         JOIN parking_slots ps ON pr.slot_number = ps.slot_number
+         WHERE pr.exit_time IS NULL
+         ORDER BY pr.entry_time DESC`,
+        (err, results) => {
+            if (err) return res.status(500).json(err);
+            res.json(results);
+        }
+    );
+});
+
+// Get reports with date range
+app.get("/api/reports", authenticateToken, (req, res) => {
+    const { startDate, endDate } = req.query;
+    const start_date = new Date(startDate);
+    start_date.setHours(0, 0, 0, 0);
+    const end_date = new Date(endDate);
+    end_date.setHours(23, 59, 59, 999);
+    
+    db.query(
+        `SELECT 
+            pr.record_id,
+            pr.plate_number,
+            c.driver_name,
+            c.phone_number,
+            pr.slot_number,
+            pr.entry_time,
+            pr.exit_time,
+            pr.duration,
+            p.amount_paid,
+            p.payment_date
+         FROM parking_records pr
+         JOIN cars c ON pr.plate_number = c.plate_number
+         LEFT JOIN payments p ON pr.record_id = p.record_id
+         WHERE pr.entry_time BETWEEN ? AND ?
+         ORDER BY pr.entry_time DESC`,
+        [start_date, end_date],
+        (err, results) => {
+            if (err) return res.status(500).json(err);
+            res.json(results);
+        }
+    );
 });
 
 // Start server
-const PORT = process.env.PORT || 3012;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

@@ -1,82 +1,104 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import Login from './components/Login';
-import Register from './components/Register';
-import SparePartManager from './components/SparePartManager';
-import StockInManager from './components/StockInManager';
-import StockOutManager from './components/StockOutManager';
-import Report from './components/Report';
-import './App.css';
+import Dashboard from './components/Dashboard';
+import Cars from './components/Cars';
+import ParkingSlots from './components/ParkingSlots';
+import ParkingRecords from './components/ParkingRecords';
+import Payments from './components/Payments';
+import Reports from './components/Reports';
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+// Protected Route component
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setIsAuthenticated(true);
-        setUser(parsedUser);
-      } catch (error) {
-        // If there's an error parsing the user data, clear the invalid data
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setIsAuthenticated(false);
-        setUser(null);
-      }
-    }
-  }, []);
-
-  const handleLogin = (userData, token) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setIsAuthenticated(true);
-    setUser(userData);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setIsAuthenticated(false);
-    setUser(null);
-  };
-
-  if (!isAuthenticated) {
+  if (loading) {
     return (
-      <Router>
-        <div className="min-h-screen bg-gray-100">
-          <Routes>
-            <Route path="/login" element={<Login onLogin={handleLogin} />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </div>
-      </Router>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
     );
   }
 
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  return (
+    <>
+      <Navbar />
+      <main className="container mx-auto px-4 py-8">
+        {children}
+      </main>
+    </>
+  );
+};
+
+const App = () => {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-100">
-        <Navbar user={user} onLogout={handleLogout} />
-        <div className="container mx-auto px-4 py-8">
-          <Routes>
-            <Route path="/" element={<Navigate to="/spare-parts" replace />} />
-            <Route path="/spare-parts" element={<SparePartManager />} />
-            <Route path="/stock-in" element={<StockInManager />} />
-            <Route path="/stock-out" element={<StockOutManager />} />
-            <Route path="/reports" element={<Report />} />
-            <Route path="*" element={<Navigate to="/spare-parts" replace />} />
-          </Routes>
-        </div>
-      </div>
+      <AuthProvider>
+        <ToastContainer position="top-right" autoClose={3000} />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cars"
+            element={
+              <ProtectedRoute>
+                <Cars />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/parking-slots"
+            element={
+              <ProtectedRoute>
+                <ParkingSlots />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/parking-records"
+            element={
+              <ProtectedRoute>
+                <ParkingRecords />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute>
+                <Payments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <Reports />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
-}
+};
 
 export default App;

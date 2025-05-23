@@ -1,95 +1,113 @@
--- Drop database if exists and create new one
-DROP DATABASE IF EXISTS sims;
-CREATE DATABASE sims;
-USE sims;
+-- Database: PSSMS (Parking Space Sales Management System)
+CREATE DATABASE IF NOT EXISTS PSSMS;
+USE PSSMS;
 
--- Drop existing tables if they exist (in correct order due to foreign key constraints)
-DROP TABLE IF EXISTS stock_out;
-DROP TABLE IF EXISTS stock_in;
-DROP TABLE IF EXISTS spare_parts;
+-- Drop existing tables if they exist
+DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS parking_records;
+DROP TABLE IF EXISTS cars;
+DROP TABLE IF EXISTS parking_slots;
 DROP TABLE IF EXISTS users;
 
 -- Create users table for authentication
 CREATE TABLE users (
     user_id INT PRIMARY KEY AUTO_INCREMENT,
-    username VARCHAR(50) UNIQUE NOT NULL,
+    username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'stock_manager') DEFAULT 'stock_manager',
+    role ENUM('admin', 'manager') NOT NULL DEFAULT 'manager',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create parking_slots table
+CREATE TABLE parking_slots (
+    slot_number VARCHAR(10) PRIMARY KEY,
+    slot_status ENUM('available', 'occupied') NOT NULL DEFAULT 'available',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_username (username)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
 
--- Create spare_parts table
-CREATE TABLE spare_parts (
-    part_id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL,
-    category VARCHAR(50) NOT NULL,
-    quantity INT NOT NULL DEFAULT 0,
-    unit_price DECIMAL(10,2) NOT NULL,
-    total_price DECIMAL(10,2) NOT NULL,
-    status ENUM('Active', 'Inactive') DEFAULT 'Active',
+-- Create cars table
+CREATE TABLE cars (
+    plate_number VARCHAR(20) PRIMARY KEY,
+    driver_name VARCHAR(100) NOT NULL,
+    phone_number VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create parking_records table
+CREATE TABLE parking_records (
+    record_id INT PRIMARY KEY AUTO_INCREMENT,
+    plate_number VARCHAR(20) NOT NULL,
+    slot_number VARCHAR(10) NOT NULL,
+    entry_time DATETIME NOT NULL,
+    exit_time DATETIME,
+    duration INT, -- Duration in minutes
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_name (name),
-    INDEX idx_category (category),
-    INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    FOREIGN KEY (plate_number) REFERENCES cars(plate_number),
+    FOREIGN KEY (slot_number) REFERENCES parking_slots(slot_number)
+);
 
--- Create stock_in table
-CREATE TABLE stock_in (
-    stock_in_id INT PRIMARY KEY AUTO_INCREMENT,
-    part_id INT NOT NULL,
-    stock_in_quantity INT NOT NULL,
-    stock_in_date DATETIME NOT NULL,
-    unit_price DECIMAL(10,2) NOT NULL,
-    total_price DECIMAL(10,2) NOT NULL,
-    notes TEXT,
+-- Create payments table
+CREATE TABLE payments (
+    payment_id INT PRIMARY KEY AUTO_INCREMENT,
+    record_id INT NOT NULL,
+    amount_paid DECIMAL(10,2) NOT NULL,
+    payment_date DATETIME NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (part_id) REFERENCES spare_parts(part_id) ON DELETE CASCADE,
-    INDEX idx_stock_in_date (stock_in_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    FOREIGN KEY (record_id) REFERENCES parking_records(record_id)
+);
 
--- Create stock_out table
-CREATE TABLE stock_out (
-    stock_out_id INT PRIMARY KEY AUTO_INCREMENT,
-    part_id INT NOT NULL,
-    stock_out_quantity INT NOT NULL,
-    stock_out_unit_price DECIMAL(10,2) NOT NULL,
-    stock_out_total_price DECIMAL(10,2) NOT NULL,
-    stock_out_date DATETIME NOT NULL,
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (part_id) REFERENCES spare_parts(part_id) ON DELETE CASCADE,
-    INDEX idx_stock_out_date (stock_out_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Insert default admin user (password: Admin@123)
+-- Note: In production, use a proper password hashing mechanism
+INSERT INTO users (username, password, role) 
+VALUES ('admin', '$2b$10$YourHashedPasswordHere', 'admin');
 
--- Insert default admin user (password: admin123)
-INSERT INTO users (username, password, role) VALUES 
-('admin', '$2b$10$8K1p/a0dR1U5bQYz8K1p/eK1p/a0dR1U5bQYz8K1p/a0dR1U5bQYz8K1', 'admin');
+-- Insert sample parking slots
+INSERT INTO parking_slots (slot_number, slot_status) VALUES
+('A1', 'available'),
+('A2', 'available'),
+('A3', 'available'),
+('B1', 'available'),
+('B2', 'available'),
+('B3', 'available'),
+('C1', 'available'),
+('C2', 'available'),
+('C3', 'available'),
+('D1', 'available');
 
--- Insert sample spare parts
-INSERT INTO spare_parts (name, category, quantity, unit_price, total_price) VALUES
-('Brake Pads', 'Brakes', 50, 25.00, 1250.00),
-('Oil Filter', 'Filters', 100, 10.00, 1000.00),
-('Air Filter', 'Filters', 75, 15.00, 1125.00),
-('Spark Plugs', 'Engine', 200, 5.00, 1000.00),
-('Timing Belt', 'Engine', 30, 40.00, 1200.00);
+-- Create indexes for better query performance
+CREATE INDEX idx_parking_records_entry_time ON parking_records(entry_time);
+CREATE INDEX idx_parking_records_exit_time ON parking_records(exit_time);
+CREATE INDEX idx_payments_payment_date ON payments(payment_date);
+CREATE INDEX idx_cars_plate_number ON cars(plate_number);
+CREATE INDEX idx_parking_slots_status ON parking_slots(slot_status);
 
--- Insert sample stock in records
-INSERT INTO stock_in (part_id, stock_in_quantity, stock_in_date, unit_price, total_price) VALUES
-(1, 20, NOW(), 25.00, 500.00),
-(2, 50, DATE_SUB(NOW(), INTERVAL 1 DAY), 10.00, 500.00),
-(3, 25, DATE_SUB(NOW(), INTERVAL 2 DAY), 15.00, 375.00),
-(4, 100, DATE_SUB(NOW(), INTERVAL 3 DAY), 5.00, 500.00),
-(5, 15, DATE_SUB(NOW(), INTERVAL 4 DAY), 40.00, 600.00);
+-- Add comments to explain table purposes
+ALTER TABLE users COMMENT = 'Stores user accounts for system access';
+ALTER TABLE parking_slots COMMENT = 'Manages parking slot availability and status';
+ALTER TABLE cars COMMENT = 'Stores registered car and driver information';
+ALTER TABLE parking_records COMMENT = 'Tracks parking entries, exits, and duration';
+ALTER TABLE payments COMMENT = 'Records parking fee payments';
 
--- Insert sample stock out records
-INSERT INTO stock_out (part_id, stock_out_quantity, stock_out_unit_price, stock_out_total_price, stock_out_date) VALUES
-(1, 5, 25.00, 125.00, NOW()),
-(2, 10, 10.00, 100.00, DATE_SUB(NOW(), INTERVAL 1 DAY)),
-(3, 8, 15.00, 120.00, DATE_SUB(NOW(), INTERVAL 2 DAY)),
-(4, 20, 5.00, 100.00, DATE_SUB(NOW(), INTERVAL 3 DAY)),
-(5, 3, 40.00, 120.00, DATE_SUB(NOW(), INTERVAL 4 DAY)); 
+-- Create view for active parking records
+CREATE VIEW active_parking AS
+SELECT 
+    pr.record_id,
+    pr.plate_number,
+    c.driver_name,
+    c.phone_number,
+    pr.slot_number,
+    pr.entry_time,
+    TIMESTAMPDIFF(MINUTE, pr.entry_time, NOW()) as current_duration
+FROM parking_records pr
+JOIN cars c ON pr.plate_number = c.plate_number
+WHERE pr.exit_time IS NULL;
+
+-- Create view for daily revenue
+CREATE VIEW daily_revenue AS
+SELECT 
+    DATE(p.payment_date) as payment_date,
+    COUNT(*) as total_transactions,
+    SUM(p.amount_paid) as total_revenue
+FROM payments p
+GROUP BY DATE(p.payment_date);
